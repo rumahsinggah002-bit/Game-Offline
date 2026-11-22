@@ -1,0 +1,14 @@
+TANGKAP BINTANG — GAME PWA OFFLINE
+
+CARA MEMASANG DI ANDROID MELALUI GITHUB PAGES
+1. Ekstrak ZIP ini.
+2. Buat repository baru di GitHub.
+3. Upload SEMUA isi folder ini (index.html, manifest.json, sw.js, icon.svg, PETUNJUK.txt) ke halaman utama/root repository.
+4. Buka Settings > Pages.
+5. Pada Build and deployment pilih Deploy from a branch, branch main, folder /(root), lalu Save.
+6. Tunggu sampai alamat GitHub Pages aktif.
+7. Buka alamat tersebut di Chrome Android saat online satu kali.
+8. Pilih menu ⋮ > Install app atau Add to Home screen.
+9. Setelah terpasang dan file tersimpan, game bisa dimainkan offline.
+
+Catatan: Ini aplikasi web installable (PWA), bukan file APK. Untuk memasang dari ZIP langsung sebagai APK diperlukan proses build Android tambahan.
