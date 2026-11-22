@@ -1,14 +1,18 @@
-TANGKAP BINTANG — GAME PWA OFFLINE
+TANGKAP BINTANG — VERSI 2 (PERBAIKAN BUG + SOUND)
 
-CARA MEMASANG DI ANDROID MELALUI GITHUB PAGES
-1. Ekstrak ZIP ini.
-2. Buat repository baru di GitHub.
-3. Upload SEMUA isi folder ini (index.html, manifest.json, sw.js, icon.svg, PETUNJUK.txt) ke halaman utama/root repository.
-4. Buka Settings > Pages.
-5. Pada Build and deployment pilih Deploy from a branch, branch main, folder /(root), lalu Save.
-6. Tunggu sampai alamat GitHub Pages aktif.
-7. Buka alamat tersebut di Chrome Android saat online satu kali.
-8. Pilih menu ⋮ > Install app atau Add to Home screen.
-9. Setelah terpasang dan file tersimpan, game bisa dimainkan offline.
+Perbaikan:
+- Gerakan keranjang dengan sentuhan hanya aktif saat area game ditekan dan digeser.
+- Tombol kiri/kanan memakai pointer capture dan pelepasan kontrol lebih aman.
+- Mencegah pemilihan teks saat menekan tombol.
+- Kontrol keyboard ditambahkan.
+- Efek suara saat mulai, menangkap bintang, terkena bom, dan game selesai.
+- Tombol untuk mengaktifkan/menonaktifkan suara.
+- Service worker memakai cache v2 agar file baru menggantikan versi lama.
 
-Catatan: Ini aplikasi web installable (PWA), bukan file APK. Untuk memasang dari ZIP langsung sebagai APK diperlukan proses build Android tambahan.
+UPDATE DI GITHUB PAGES:
+1. Ekstrak ZIP.
+2. Upload/ganti index.html, sw.js, manifest.json, icon.svg di repository GitHub yang lama.
+3. Pastikan file berada di root repository.
+4. Tunggu GitHub Pages selesai memperbarui.
+5. Buka situs game saat online, lalu refresh. Jika masih versi lama, tutup tab dan buka ulang; service worker baru akan mengganti cache lama.
+6. Setelah versi baru terbuka, game tetap bisa dimainkan offline.

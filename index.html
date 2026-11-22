@@ -8,49 +8,169 @@
 <link rel="manifest" href="manifest.json">
 <title>Tangkap Bintang</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#101827;color:#fff;font-family:system-ui,Arial;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:16px}
-.app{width:min(100%,480px);text-align:center}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-h1{font-size:28px;margin:8px 0;color:#facc15}.score{font-weight:700;background:#243247;padding:10px 15px;border-radius:12px}
-canvas{width:100%;height:auto;background:linear-gradient(#172b48,#0b1423);border:2px solid #34465f;border-radius:18px;display:block;touch-action:none}
-p{color:#cbd5e1}.controls{display:flex;gap:12px;justify-content:center;margin-top:14px}
-button{border:0;border-radius:14px;padding:13px 22px;font-size:16px;font-weight:700;background:#facc15;color:#172033}
-#start{background:#22c55e;color:#06210f}.hint{font-size:13px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;overscroll-behavior:none}
+body{background:#101827;color:#fff;font-family:system-ui,Arial,sans-serif;display:flex;justify-content:center;align-items:center;padding:14px;user-select:none;-webkit-user-select:none}
+.app{width:min(100%,480px);text-align:center}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.brand{text-align:left;min-width:0}.eyebrow{font-size:12px;color:#9fb0c6;letter-spacing:1px}
+h1{font-size:clamp(22px,6vw,30px);margin:5px 0;color:#facc15;white-space:nowrap}
+.score{font-weight:700;background:#243247;padding:11px 14px;border-radius:13px;white-space:nowrap}
+canvas{width:100%;height:auto;aspect-ratio:3/4;background:linear-gradient(#172b48,#0b1423);border:2px solid #34465f;border-radius:20px;display:block;touch-action:none;user-select:none}
+#status{color:#cbd5e1;min-height:25px;margin:14px 0}
+.controls{display:flex;gap:10px;justify-content:center;align-items:stretch;margin-top:12px}
+button{border:0;border-radius:15px;padding:14px 10px;font-size:clamp(14px,4vw,17px);font-weight:700;background:#facc15;color:#172033;flex:1;min-width:0;touch-action:none;user-select:none;-webkit-user-select:none}
+button:active{filter:brightness(.9);transform:scale(.98)}
+#start{background:#22c55e;color:#06210f;flex:1.05}
+#sound{margin-top:10px;background:#243247;color:white;width:100%;padding:10px}
+.hint{font-size:12px;line-height:1.5;color:#aebbd0;margin:12px 0}
+@media(max-height:740px){body{align-items:flex-start}.app{padding-bottom:10px}canvas{max-height:58vh;width:auto;max-width:100%;margin:auto}}
 </style>
 </head>
 <body>
 <main class="app">
- <div class="top"><div style="text-align:left"><div style="font-size:12px;color:#9fb0c6">GAME OFFLINE</div><h1>⭐ Tangkap Bintang</h1></div><div class="score">Skor: <span id="score">0</span></div></div>
- <canvas id="game" width="420" height="560" aria-label="Area permainan"></canvas>
- <p id="status">Tangkap bintang yang jatuh. Hindari bom!</p>
- <div class="controls"><button id="left">◀ Kiri</button><button id="start">MULAI</button><button id="right">Kanan ▶</button></div>
- <p class="hint">Geser jari di layar atau gunakan tombol kiri/kanan. Game dapat dimainkan tanpa internet setelah dibuka pertama kali.</p>
+ <div class="top">
+  <div class="brand"><div class="eyebrow">GAME OFFLINE</div><h1>⭐ Tangkap Bintang</h1></div>
+  <div class="score">Skor: <span id="score">0</span></div>
+ </div>
+ <canvas id="game" width="420" height="560" aria-label="Area permainan Tangkap Bintang"></canvas>
+ <p id="status" aria-live="polite">Tangkap bintang yang jatuh. Hindari bom!</p>
+ <div class="controls">
+  <button id="left" aria-label="Gerak kiri">◀ Kiri</button>
+  <button id="start">MULAI</button>
+  <button id="right" aria-label="Gerak kanan">Kanan ▶</button>
+ </div>
+ <button id="sound" aria-pressed="true">🔊 Suara: AKTIF</button>
+ <p class="hint">Tahan tombol kiri/kanan atau geser keranjang di area permainan. Tangkap ⭐ dan hindari 💣. Bisa dimainkan offline setelah dibuka pertama kali.</p>
 </main>
 <script>
-const c=document.getElementById('game'),ctx=c.getContext('2d'),scoreEl=document.getElementById('score'),statusEl=document.getElementById('status');
-let player={x:180,y:500,w:60,h:22},items=[],score=0,playing=false,frame=0,move=0,raf;
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'),statusEl=document.getElementById('status');
+const startBtn=document.getElementById('start'),soundBtn=document.getElementById('sound');
+const W=canvas.width,H=canvas.height;
+let player={x:180,y:510,w:60,h:22},items=[],score=0,playing=false,frame=0,move=0,raf=0;
+let audio=null,soundOn=true,lastSpawn=0,dragging=false,lastTime=0;
+
+function initAudio(){
+ if(!soundOn)return;
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  if(!audio)audio=new AC();
+  if(audio.state==='suspended')audio.resume();
+ }catch(e){}
+}
+function tone(freq,duration,type='sine',volume=.045,delay=0){
+ if(!soundOn)return;
+ initAudio();if(!audio)return;
+ try{
+  const t=audio.currentTime+delay,osc=audio.createOscillator(),gain=audio.createGain();
+  osc.type=type;osc.frequency.setValueAtTime(freq,t);
+  gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(volume,t+.012);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+  osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+duration+.03);
+ }catch(e){}
+}
+function sfx(name){
+ if(name==='start'){tone(440,.09);tone(660,.12,'sine',.04,.1)}
+ if(name==='catch'){tone(880,.08,'triangle',.05);tone(1175,.1,'triangle',.035,.07)}
+ if(name==='bomb'){tone(180,.25,'sawtooth',.06);tone(90,.35,'sawtooth',.05,.16)}
+ if(name==='over'){tone(440,.15,'triangle',.04);tone(330,.2,'triangle',.04,.16);tone(220,.3,'triangle',.04,.36)}
+}
 function draw(){
- ctx.clearRect(0,0,c.width,c.height);
- // stars background
- for(let i=0;i<35;i++){let x=(i*83)%420,y=(i*137+frame*.35)%560;ctx.fillStyle='#64748b';ctx.fillRect(x,y,2,2)}
+ ctx.clearRect(0,0,W,H);
+ for(let i=0;i<42;i++){
+  const x=(i*83)%W,y=(i*137+frame*.35)%H;
+  ctx.fillStyle='#64748b';ctx.fillRect(x,y,2,2);
+ }
+ // Keranjang pemain
  ctx.fillStyle='#38bdf8';ctx.beginPath();ctx.roundRect(player.x,player.y,player.w,player.h,9);ctx.fill();
  ctx.fillStyle='#e0f2fe';ctx.fillRect(player.x+12,player.y+5,player.w-24,4);
  items.forEach(o=>{ctx.font='28px sans-serif';ctx.textAlign='center';ctx.fillText(o.bomb?'💣':'⭐',o.x,o.y)});
- if(!playing){ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(0,0,420,560);ctx.fillStyle='white';ctx.textAlign='center';ctx.font='bold 26px system-ui';ctx.fillText('TANGKAP BINTANG',210,245);ctx.font='16px system-ui';ctx.fillText('Tekan MULAI untuk bermain',210,280)}
+ if(!playing){
+  ctx.fillStyle='rgba(0,0,0,.38)';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='white';ctx.textAlign='center';ctx.font='bold 26px system-ui';
+  ctx.fillText(score>0?'GAME SELESAI':'TANGKAP BINTANG',W/2,245);
+  ctx.font='16px system-ui';ctx.fillText(score>0?'Skor: '+score+'  •  Tekan MULAI':'Tekan MULAI untuk bermain',W/2,280);
+ }
 }
-function loop(){
- if(!playing)return;frame++;player.x=Math.max(0,Math.min(360,player.x+move*6));
- if(frame%42===0)items.push({x:20+Math.random()*380,y:-10,bomb:Math.random()<.22,speed:2+Math.random()*2});
- items.forEach(o=>o.y+=o.speed);
- for(let i=items.length-1;i>=0;i--){let o=items[i];if(o.y>player.y-8&&o.y<player.y+player.h+12&&o.x>player.x-8&&o.x<player.x+player.w+8){if(o.bomb){end();return}else{score+=10;scoreEl.textContent=score;items.splice(i,1)}}else if(o.y>580)items.splice(i,1)}
- draw();raf=requestAnimationFrame(loop)
+function finish(hitBomb=false){
+ if(!playing)return;
+ playing=false;move=0;dragging=false;cancelAnimationFrame(raf);
+ statusEl.textContent=(hitBomb?'Terkena bom! ':'Game selesai! ')+'Skor akhir: '+score+'. Tekan MULAI untuk mencoba lagi.';
+ sfx('over');draw();
 }
-function end(){playing=false;cancelAnimationFrame(raf);statusEl.textContent='Game selesai! Skor akhir: '+score+'. Tekan MULAI untuk mencoba lagi.';draw()}
-function start(){score=0;scoreEl.textContent='0';items=[];frame=0;player.x=180;playing=true;statusEl.textContent='Ayo tangkap bintangnya!';cancelAnimationFrame(raf);loop()}
-document.getElementById('start').onclick=start;
-function hold(dir,el){el.addEventListener('pointerdown',e=>{e.preventDefault();move=dir});['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,()=>move=0))}
-hold(-1,document.getElementById('left'));hold(1,document.getElementById('right'));
-c.addEventListener('pointermove',e=>{if(!playing)return;let r=c.getBoundingClientRect();player.x=Math.max(0,Math.min(360,(e.clientX-r.left)/r.width*420-player.w/2))});
+function loop(timestamp){
+ if(!playing)return;
+ const dt=lastTime?Math.min((timestamp-lastTime)/16.67,2):1;lastTime=timestamp;frame++;
+ player.x=Math.max(0,Math.min(W-player.w,player.x+move*5.5*dt));
+ if(frame%42===0){
+  items.push({x:22+Math.random()*(W-44),y:-12,bomb:Math.random()<.2,speed:2+Math.random()*1.8});
+ }
+ for(let i=items.length-1;i>=0;i--){
+  const o=items[i];o.y+=o.speed*dt;
+  const closeY=o.y>player.y-8&&o.y<player.y+player.h+15;
+  const closeX=o.x>player.x-8&&o.x<player.x+player.w+8;
+  if(closeY&&closeX){
+   if(o.bomb){finish(true);return}
+   score+=10;scoreEl.textContent=score;items.splice(i,1);sfx('catch');
+  }else if(o.y>H+35)items.splice(i,1);
+ }
+ draw();raf=requestAnimationFrame(loop);
+}
+function startGame(){
+ initAudio();score=0;scoreEl.textContent='0';items=[];frame=0;lastTime=0;
+ player.x=(W-player.w)/2;playing=true;move=0;statusEl.textContent='Ayo tangkap bintangnya!';
+ sfx('start');cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
+}
+startBtn.addEventListener('click',startGame);
+
+function bindHold(button,direction){
+ button.addEventListener('pointerdown',e=>{
+  e.preventDefault();if(!playing)return;
+  move=direction;
+  try{button.setPointerCapture(e.pointerId)}catch(err){}
+ });
+ const release=e=>{e.preventDefault();move=0};
+ ['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(type=>button.addEventListener(type,release));
+}
+bindHold(document.getElementById('left'),-1);
+bindHold(document.getElementById('right'),1);
+
+// Geser keranjang hanya saat jari/mouse sedang menekan area game.
+function movePlayer(e){
+ const r=canvas.getBoundingClientRect();
+ const scale=W/r.width;
+ player.x=Math.max(0,Math.min(W-player.w,(e.clientX-r.left)*scale-player.w/2));
+}
+canvas.addEventListener('pointerdown',e=>{
+ if(!playing)return;e.preventDefault();dragging=true;
+ try{canvas.setPointerCapture(e.pointerId)}catch(err){}
+ movePlayer(e);
+});
+canvas.addEventListener('pointermove',e=>{if(dragging&&playing){e.preventDefault();movePlayer(e)}});
+function stopDrag(){dragging=false}
+canvas.addEventListener('pointerup',stopDrag);
+canvas.addEventListener('pointercancel',stopDrag);
+canvas.addEventListener('lostpointercapture',stopDrag);
+
+window.addEventListener('keydown',e=>{
+ if(e.key==='ArrowLeft'||e.key==='a'){e.preventDefault();move=-1}
+ if(e.key==='ArrowRight'||e.key==='d'){e.preventDefault();move=1}
+});
+window.addEventListener('keyup',e=>{if(['ArrowLeft','ArrowRight','a','d'].includes(e.key))move=0});
+window.addEventListener('blur',()=>{move=0;dragging=false});
+
+soundBtn.addEventListener('click',()=>{
+ soundOn=!soundOn;
+ soundBtn.textContent=soundOn?'🔊 Suara: AKTIF':'🔇 Suara: MATI';
+ soundBtn.setAttribute('aria-pressed',String(soundOn));
+ if(soundOn){initAudio();tone(660,.1)}
+});
 draw();
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+if('serviceWorker' in navigator){
+ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 </script>
 </body></html>
